@@ -4,31 +4,7 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import { generateRoomCode, sanitizePlayer } from "./lib/utils";
-
-// -------------------- INTERFACCE --------------------
-interface PlayerInfo {
-  id: string;
-  name: string;
-  pronouns: string;
-}
-
-export interface Player extends PlayerInfo {
-  life_points: number;
-  poison_counters: number;
-  rad_counters: number;
-  experience_counters: number;
-  energy_counters: number;
-  storm_counters: number;
-}
-
-export interface Room {
-  id: string;
-  players: Player[];
-  turn: number;
-  turn_player: number;
-  turn_phase: "BEGIN" | "M1" | "COMBAT" | "M2" | "END";
-  has_started: boolean;
-}
+import type { Player, PlayerInfo, Room } from "@models/shared";
 
 // -------------------- ROOM DATA --------------------
 const activeRoomsData = new Map<string, Room>();
