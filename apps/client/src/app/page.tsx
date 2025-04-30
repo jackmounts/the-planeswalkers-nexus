@@ -39,17 +39,23 @@ import { cookieConsentConfig } from "../../cookieconsent-config";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import useProfileStore from "@/store/profile.store";
+import { v4 as uuidv4 } from "uuid";
 
 export default function Home() {
   const [roomCode, setRoomCode] = useState<string>("");
   const [roomInput, setRoomInput] = useState<string>("");
   const router = useRouter();
-  const { name, setName } = useProfileStore();
+  const { name, setName, id, setId } = useProfileStore();
 
   useEffect(() => {
     CookieConsent.run({
       ...cookieConsentConfig,
     });
+  }, []);
+
+  useEffect(() => {
+    const uuid = uuidv4();
+    setId(uuid);
   }, []);
 
   const generateRoomCode = () => {
