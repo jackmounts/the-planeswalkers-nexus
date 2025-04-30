@@ -40,8 +40,10 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import useProfileStore from "@/store/profile.store";
 import { v4 as uuidv4 } from "uuid";
+import axios from "axios";
 
 export default function Home() {
+  const [isLoading, setIsLoading] = useState(false);
   const [roomCode, setRoomCode] = useState<string>("");
   const [roomInput, setRoomInput] = useState<string>("");
   const router = useRouter();
@@ -58,26 +60,62 @@ export default function Home() {
     setId(uuid);
   }, []);
 
-  const generateRoomCode = () => {
-    setRoomCode(Math.random().toString(36).substring(2, 8).toUpperCase());
+  const generateRoomCode = async () => {
+    try {
+      const response = await axios.get("http://localhost:8080/api/gen-code");
+      setRoomCode(response.data.roomId);
+    } catch (error) {
+      toast.error("Failed to generate room code. Please try again.");
+    }
   };
 
-  const gotoRoom = () => {
-    router.push(`/room/${roomCode}`);
+  const createRoom = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.post("http://localhost:8080/api/rooms", {
+        id: roomCode,
+      });
+      if (response.status === 201) {
+        router.push(`/room/${roomCode}`);
+        toast.success("Room created successfully!");
+      } else {
+        toast.error(response.data.error);
+      }
+    } catch (error) {
+      toast.error("Failed to create room. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const checkRoomCode = () => {
-    // Check if room code exist in the server
-    // If it does, redirect to the room
-    // If it doesn't, show an error message
-
-    // This actions are mocked
-    router.push(`/room/${roomInput}`);
+  const checkRoomCode = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get(
+        "http://localhost:8080/api/rooms/" + roomInput + "/exists"
+      );
+      if (response.status === 200 && response.data.exists === true) {
+        router.push(`/room/${roomInput}`);
+        toast.success("Joined Room!");
+      } else if (response.status === 200 && response.data.exists === false) {
+        toast.error("Room does not exist.");
+      } else {
+        toast.error(response.data.error);
+      }
+    } catch (error) {
+      toast.error("Failed to join room. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="relative flex h-screen w-screen items-center justify-center">
-      {/* <Galaxy2DBackground /> */}
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20">
+          <LoaderCircle className="animate-spin scale-200" />
+        </div>
+      )}
       <Card className="relative z-10 min-w-[380px] lg:w-[540px] xl:w-[620px] m-4">
         <CardHeader className="w-full justify-center items-center">
           <CardTitle className="text-2xl lg:text-4xl xl:text-5xl font-semibold">
@@ -162,7 +200,7 @@ export default function Home() {
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    onClick={() => gotoRoom()}
+                    onClick={() => createRoom()}
                     disabled={!roomCode}
                   >
                     Create

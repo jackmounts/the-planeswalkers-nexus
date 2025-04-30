@@ -27,13 +27,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // -------------------- API --------------------
-app.use(
-  cors({
-    origin: "https://your-frontend-domain.com",
-    methods: ["GET", "POST", "PUT"],
-    credentials: true,
-  })
-);
+app.use(cors());
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 30,
@@ -41,30 +35,12 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-app.get("/api/rooms/generate-code", (req: Request, res: Response) => {
+app.get("/api/gen-code", (req: Request, res: Response) => {
   let roomId = generateRoomCode();
   while (activeRoomsData.has(roomId)) {
     roomId = generateRoomCode();
   }
   res.status(200).json({ roomId });
-});
-
-app.put("/api/rooms/:id/start", (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  if (!activeRoomsData.has(id)) {
-    res.status(404).json({ error: "Room not found" });
-    return;
-  }
-
-  const room = activeRoomsData.get(id);
-  if (room?.has_started) {
-    res.status(409).json({ error: "Room already started" });
-    return;
-  }
-
-  room!.has_started = true;
-  res.status(200).json({ message: "Room started" });
 });
 
 app.post("/api/rooms", (req: Request, res: Response) => {
@@ -94,6 +70,24 @@ app.post("/api/rooms", (req: Request, res: Response) => {
   res.status(201).json({ message: "Room created", roomId: id });
 });
 
+app.put("/api/rooms/:id/start", (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  if (!activeRoomsData.has(id)) {
+    res.status(404).json({ error: "Room not found" });
+    return;
+  }
+
+  const room = activeRoomsData.get(id);
+  if (room?.has_started) {
+    res.status(409).json({ error: "Room already started" });
+    return;
+  }
+
+  room!.has_started = true;
+  res.status(200).json({ message: "Room started" });
+});
+
 app.get("/api/rooms", (req: Request, res: Response) => {
   const roomIds = Array.from(activeRoomsData.keys());
   res.json({ rooms: roomIds });
@@ -113,6 +107,17 @@ app.get("/api/rooms/:id", (req: Request, res: Response) => {
     players: room!.players.map(sanitizePlayer),
   };
   res.json({ room: sanitizedRoom });
+});
+
+app.get("/api/rooms/:id/exists", (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  if (!activeRoomsData.has(id)) {
+    res.status(404).json({ error: "Room not found" });
+    return;
+  }
+
+  res.status(200).json({ exists: true });
 });
 
 // -------------------- WEBSOCKET --------------------
