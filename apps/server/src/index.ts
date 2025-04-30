@@ -194,7 +194,7 @@ io.on("connection", (socket) => {
 });
 
 // -------------------- START SERVER --------------------
-const PORT = 3000;
+const PORT = 8080;
 server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
