@@ -1,4 +1,4 @@
-import { Player } from "..";
+import type { Player } from "@models/shared";
 import validator from "validator";
 
 export function generateRoomCode(): string {
