@@ -45,12 +45,11 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import useProfileStore from "@/store/profile.store";
 import { v4 as uuidv4 } from "uuid";
-import { useAxios } from "@/lib/useAxios";
+import axios from "axios";
 
 export default function Home() {
   const [roomCode, setRoomCode] = useState<string>("");
   const [roomInput, setRoomInput] = useState<string>("");
-  const axios = useAxios();
   const router = useRouter();
   const { name, setName, id, setId, pronouns, setPronouns } = useProfileStore();
 
@@ -80,8 +79,8 @@ export default function Home() {
         id: roomCode,
       });
       if (response.status === 201) {
-        router.push(`/room/${roomCode}`);
         toast.success("Room created successfully!");
+        router.push(`/room/${roomCode}`);
       } else {
         toast.error(response.data.error);
       }

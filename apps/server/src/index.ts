@@ -24,7 +24,12 @@ const app = express();
 app.use(express.json());
 
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+  },
+});
 
 // -------------------- API --------------------
 app.use(cors());
@@ -122,53 +127,44 @@ app.get("/api/rooms/:id/exists", (req: Request, res: Response) => {
 
 // -------------------- WEBSOCKET --------------------
 io.on("connection", (socket) => {
-  socket.on("joinRoom", (roomId: string, playerInfo: PlayerInfo) => {
-    if (!activeRoomsData.has(roomId)) {
+  socket.on("join_room", (roomId: string, playerInfo: PlayerInfo) => {
+    const room = activeRoomsData.get(roomId);
+    if (!room) {
       socket.emit("error", "Room not found");
       return;
     }
-
-    const room = activeRoomsData.get(roomId);
     const player: Player = {
       ...playerInfo,
+      socket_id: socket.id,
       life_points: 40,
       poison_counters: 0,
       rad_counters: 0,
       experience_counters: 0,
       energy_counters: 0,
       storm_counters: 0,
+      turnOrder: room.players.length + 1,
     };
 
-    room!.players.push(player);
+    const existingPlayerIndex = room.players.findIndex(
+      (p) => p.id === playerInfo.id
+    );
+    if (existingPlayerIndex !== -1) {
+      room.players[existingPlayerIndex] = player;
+    } else {
+      room.players.push(player);
+    }
 
     socket.join(roomId);
-    socket.emit("joinedRoom", roomId, sanitizePlayer(player));
-
-    socket.to(roomId).emit("playerJoined", playerInfo.id);
-    const otherPlayerIds = room!.players
-      .filter((p) => p.id !== playerInfo.id)
-      .map((p) => p.id);
-    socket.emit("otherPlayers", otherPlayerIds);
-
-    // Store playerId and roomId on the socket for disconnect cleanup
-    (socket.data as any).playerId = playerInfo.id;
-    (socket.data as any).roomId = roomId;
+    io.to(roomId).emit("players_update", room.players);
+    socket.emit("your_player_id", socket.id);
   });
 
-  socket.on("signal", ({ roomId, to, data }) => {
-    socket.to(roomId).emit("signal", { from: socket.id, to, data });
-  });
-
-  socket.on("disconnecting", () => {
-    const playerId = (socket.data as any).playerId;
-    const roomId = (socket.data as any).roomId;
-    if (roomId && playerId) {
-      const room = activeRoomsData.get(roomId);
-      if (room) {
-        room.players = room.players.filter((p) => p.id !== playerId);
-        if (room.players.length === 0) {
-          activeRoomsData.delete(roomId);
-        }
+  socket.on("disconnect", () => {
+    for (const [roomId, room] of activeRoomsData.entries()) {
+      const index = room.players.findIndex((p) => p.socket_id === socket.id);
+      if (index !== -1) {
+        room.players.splice(index, 1);
+        io.to(roomId).emit("players_update", room.players);
       }
     }
   });

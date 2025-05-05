@@ -5,12 +5,16 @@ export interface PlayerInfo {
 }
 
 export interface Player extends PlayerInfo {
+  socket_id: string;
   life_points: number;
   poison_counters: number;
   rad_counters: number;
   experience_counters: number;
   energy_counters: number;
   storm_counters: number;
+  turnOrder: number;
+  is_active?: boolean;
+  color?: string;
 }
 
 export interface Room {
