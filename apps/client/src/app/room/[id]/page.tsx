@@ -14,6 +14,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Home, Mic, ScreenShare, Video, X } from "lucide-react";
+import { toast } from "sonner";
+import { useAxios } from "@/lib/useAxios";
 
 interface Player {
   id: string;
@@ -26,6 +28,11 @@ const RoomPage: React.FC = () => {
   const [players, setPlayers] = React.useState<Player[]>([]);
   const { id } = useParams();
   const router = useRouter();
+  const axios = useAxios();
+
+  useEffect(() => {
+    checkRoomCode();
+  }, []);
 
   useEffect(() => {
     // Simulate fetching players from a server
@@ -36,6 +43,20 @@ const RoomPage: React.FC = () => {
       { id: "4", name: "Player 4", color: "yellow", turnOrder: 4 },
     ]);
   }, []);
+
+  const checkRoomCode = async () => {
+    try {
+      const response = await axios.get(
+        "http://localhost:8080/api/rooms/" + id + "/exists"
+      );
+      if (response.status === 200) {
+        toast.success("Joined Room!");
+      }
+    } catch (error) {
+      toast.error("Room not found");
+      router.push("/");
+    }
+  };
 
   return (
     <div className="w-screen h-screen flex flex-col bg-neutral-800">

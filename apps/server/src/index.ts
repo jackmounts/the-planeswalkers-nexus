@@ -131,7 +131,7 @@ io.on("connection", (socket) => {
     const room = activeRoomsData.get(roomId);
     const player: Player = {
       ...playerInfo,
-      life_points: 20,
+      life_points: 40,
       poison_counters: 0,
       rad_counters: 0,
       experience_counters: 0,

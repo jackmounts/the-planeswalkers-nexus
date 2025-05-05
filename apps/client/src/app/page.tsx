@@ -28,10 +28,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { LoaderCircle, RefreshCcw } from "lucide-react";
+import { ChevronDown, LoaderCircle, RefreshCcw } from "lucide-react";
 import { generateName } from "@/lib/utils";
 import "vanilla-cookieconsent/dist/cookieconsent.css";
 import * as CookieConsent from "vanilla-cookieconsent";
@@ -40,14 +45,14 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import useProfileStore from "@/store/profile.store";
 import { v4 as uuidv4 } from "uuid";
-import axios from "axios";
+import { useAxios } from "@/lib/useAxios";
 
 export default function Home() {
-  const [isLoading, setIsLoading] = useState(false);
   const [roomCode, setRoomCode] = useState<string>("");
   const [roomInput, setRoomInput] = useState<string>("");
+  const axios = useAxios();
   const router = useRouter();
-  const { name, setName, id, setId } = useProfileStore();
+  const { name, setName, id, setId, pronouns, setPronouns } = useProfileStore();
 
   useEffect(() => {
     CookieConsent.run({
@@ -70,7 +75,6 @@ export default function Home() {
   };
 
   const createRoom = async () => {
-    setIsLoading(true);
     try {
       const response = await axios.post("http://localhost:8080/api/rooms", {
         id: roomCode,
@@ -83,39 +87,24 @@ export default function Home() {
       }
     } catch (error) {
       toast.error("Failed to create room. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const checkRoomCode = async () => {
-    setIsLoading(true);
     try {
       const response = await axios.get(
         "http://localhost:8080/api/rooms/" + roomInput + "/exists"
       );
-      if (response.status === 200 && response.data.exists === true) {
+      if (response.status === 200) {
         router.push(`/room/${roomInput}`);
-        toast.success("Joined Room!");
-      } else if (response.status === 200 && response.data.exists === false) {
-        toast.error("Room does not exist.");
-      } else {
-        toast.error(response.data.error);
       }
     } catch (error) {
-      toast.error("Failed to join room. Please try again.");
-    } finally {
-      setIsLoading(false);
+      toast.error("Room not found");
     }
   };
 
   return (
     <div className="relative flex h-screen w-screen items-center justify-center">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20">
-          <LoaderCircle className="animate-spin scale-200" />
-        </div>
-      )}
       <Card className="relative z-10 min-w-[380px] lg:w-[540px] xl:w-[620px] m-4">
         <CardHeader className="w-full justify-center items-center">
           <CardTitle className="text-2xl lg:text-4xl xl:text-5xl font-semibold">
@@ -128,7 +117,7 @@ export default function Home() {
         <CardContent className="flex flex-col items-center space-y-6">
           <div className="w-full space-y-2">
             <Label htmlFor="name">Wizard name</Label>
-            <div className="flex flex-row w-full items-center space-x-2">
+            <div className="flex flex-row w-full items-center space-x-2 mb-4">
               <Input
                 id="name"
                 type="name"
@@ -147,6 +136,21 @@ export default function Home() {
                 <RefreshCcw />
               </Button>
             </div>
+            <Collapsible>
+              <CollapsibleTrigger className="flex flex-row items-center hover:underline hover:cursor-pointer">
+                Advanced <ChevronDown />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="w-full space-y-2 mt-4 pl-4">
+                <Label htmlFor="pronouns">Pronouns</Label>
+                <Input
+                  id="pronouns"
+                  type="name"
+                  placeholder="she/her"
+                  value={pronouns}
+                  onChange={(e) => setPronouns(e.target.value)}
+                />
+              </CollapsibleContent>
+            </Collapsible>
           </div>
           <div className="w-full flex flex-col items-center space-y-2">
             <AlertDialog
@@ -209,7 +213,7 @@ export default function Home() {
               </AlertDialogContent>
             </AlertDialog>
             <div className="text-gray-800/60 font-semibold">or</div>
-            <Dialog>
+            <Dialog onOpenChange={() => setRoomInput("")}>
               <DialogTrigger asChild>
                 <Button
                   className="w-full cursor-pointer h-12"

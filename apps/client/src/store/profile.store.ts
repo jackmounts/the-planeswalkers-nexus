@@ -8,9 +8,9 @@ type ProfileStoreState = {
 };
 
 type ProfileStoreAction = {
+  setId: (id: string) => void;
   setName: (name: string) => void;
   setPronouns: (pronouns: string) => void;
-  setId: (id: string) => void;
   reset: () => void;
 };
 
@@ -22,9 +22,9 @@ const useProfileStore = create<ProfileStore>()(
       name: "",
       pronouns: "",
       id: "",
+      setId: (id) => set({ id }),
       setName: (name) => set({ name }),
       setPronouns: (pronouns) => set({ pronouns }),
-      setId: (id) => set({ id }),
       reset: () => set({ name: "", pronouns: "", id: "" }),
     }),
     {
