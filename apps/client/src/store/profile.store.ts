@@ -22,7 +22,7 @@ const useProfileStore = create<ProfileStore>()(
   persist(
     (set) => ({
       name: "",
-      pronouns: undefined,
+      pronouns: "",
       id: "",
       hasHydrated: false,
       setId: (id) => set({ id }),

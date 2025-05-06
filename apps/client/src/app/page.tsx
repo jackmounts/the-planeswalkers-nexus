@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -115,6 +121,7 @@ export default function Home() {
                 id="name"
                 type="name"
                 placeholder="Liliana of the Veil"
+                maxLength={24}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -139,6 +146,7 @@ export default function Home() {
                   id="pronouns"
                   type="name"
                   placeholder="she/her"
+                  maxLength={10}
                   value={pronouns}
                   onChange={(e) => setPronouns(e.target.value)}
                 />
@@ -247,9 +255,51 @@ export default function Home() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-row w-full items-center justify-end-safe">
-          <p className="text-gray-800/60 font-semibold text-sm">
-            copyright ©. all right reserved.
-          </p>
+          <Dialog>
+            <DialogTrigger>
+              <p className="text-gray-800/60 font-semibold text-sm cursor-pointer hover:underline">
+                Need some help?
+              </p>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>What is the Planeswalker Nexus?</DialogTitle>
+                <DialogDescription asChild>
+                  <div>
+                    A cool app to play Magic: The Gathering with your friends
+                    using a webcam and your real cards. You can create a room
+                    and share the code with your friends to play together. You
+                    can also join a room by entering the code provided by your
+                    friends. The app is designed to be easy to use and to
+                    provide a great experience for all players.
+                    <p>FAQs</p>
+                    <Accordion type="single" collapsible className="w-full">
+                      <AccordionItem value="item-1">
+                        <AccordionTrigger>Is it accessible?</AccordionTrigger>
+                        <AccordionContent>
+                          Yes. It adheres to the WAI-ARIA design pattern.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-2">
+                        <AccordionTrigger>Is it styled?</AccordionTrigger>
+                        <AccordionContent>
+                          Yes. It comes with default styles that matches the
+                          other components&apos; aesthetic.
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-3">
+                        <AccordionTrigger>Is it animated?</AccordionTrigger>
+                        <AccordionContent>
+                          Yes. It's animated by default, but you can disable it
+                          if you prefer.
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </div>
+                </DialogDescription>
+              </DialogHeader>
+            </DialogContent>
+          </Dialog>
         </CardFooter>
       </Card>
     </div>

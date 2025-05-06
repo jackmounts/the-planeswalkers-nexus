@@ -12,3 +12,8 @@ export function computeGridClass(n: number) {
   if (n <= 6) return "grid-rows-2 grid-cols-3";
   return "grid-rows-3 grid-cols-3";
 }
+
+export function decodeHtmlEntities(text: string): string {
+  const doc = new DOMParser().parseFromString(text, "text/html");
+  return doc.documentElement.textContent || "";
+}

@@ -4,12 +4,7 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import { generateRoomCode, sanitizePlayer } from "./lib/utils";
-import {
-  generateName,
-  type Player,
-  type PlayerInfo,
-  type Room,
-} from "@models/shared";
+import { generateName, Player, PlayerInfo, Room } from "@models/shared";
 
 // -------------------- ROOM DATA --------------------
 const activeRoomsData = new Map<string, Room>();
@@ -75,6 +70,7 @@ app.post("/api/rooms", (req: Request, res: Response) => {
     turn: 0,
     turn_player: 0,
     turn_phase: "BEGIN",
+    // Yet to implement turn phase logic
     has_started: false,
   };
 
@@ -144,7 +140,7 @@ io.on("connection", (socket) => {
 
     if (!playerInfo.name || playerInfo.name.trim() === "") {
       playerInfo.name = generateName();
-      playerInfo.pronouns = ""; // o un default
+      playerInfo.pronouns = "";
     }
 
     let player = room.players.find((p) => p.id === playerInfo.id);
@@ -185,6 +181,32 @@ io.on("connection", (socket) => {
       }
     }
   );
+
+  socket.on("media_toggle", (msg: { type: string; enabled: boolean }) => {
+    const roomId = socket.data.roomId;
+    socket.to(roomId).emit("peer_media_toggle", {
+      from: socket.id,
+      type: msg.type,
+      enabled: msg.enabled,
+    });
+  });
+
+  socket.on("pass_turn", (roomId: string) => {
+    const room = activeRoomsData.get(roomId);
+    if (!room) {
+      socket.emit("error", "Room not found");
+      return;
+    }
+
+    room.turn_player = (room.turn_player + 1) % room.players.length;
+    // Yet to implement turn phase logic
+    room.turn_phase = "BEGIN";
+    io.to(roomId).emit("turn_update", {
+      turn: room.turn,
+      turn_player: room.turn_player,
+      turn_phase: room.turn_phase,
+    });
+  });
 
   socket.on("disconnect", () => {
     for (const [roomId, room] of activeRoomsData.entries()) {

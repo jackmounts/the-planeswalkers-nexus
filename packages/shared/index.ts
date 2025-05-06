@@ -14,6 +14,8 @@ export interface Player extends PlayerInfo {
   storm_counters: number;
   turnOrder: number;
   is_active?: boolean;
+  is_muted?: boolean;
+  is_video_off?: boolean;
   color?: string;
 }
 
