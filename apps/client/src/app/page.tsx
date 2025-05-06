@@ -37,31 +37,25 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, LoaderCircle, RefreshCcw } from "lucide-react";
-import { generateName } from "@/lib/utils";
 import "vanilla-cookieconsent/dist/cookieconsent.css";
 import * as CookieConsent from "vanilla-cookieconsent";
 import { cookieConsentConfig } from "../../cookieconsent-config";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import useProfileStore from "@/store/profile.store";
-import { v4 as uuidv4 } from "uuid";
 import axios from "axios";
+import { generateName } from "@models/shared";
 
 export default function Home() {
   const [roomCode, setRoomCode] = useState<string>("");
   const [roomInput, setRoomInput] = useState<string>("");
   const router = useRouter();
-  const { name, setName, id, setId, pronouns, setPronouns } = useProfileStore();
+  const { name, setName, pronouns, setPronouns } = useProfileStore();
 
   useEffect(() => {
     CookieConsent.run({
       ...cookieConsentConfig,
     });
-  }, []);
-
-  useEffect(() => {
-    const uuid = uuidv4();
-    setId(uuid);
   }, []);
 
   const generateRoomCode = async () => {
@@ -160,7 +154,7 @@ export default function Home() {
               }}
             >
               <AlertDialogTrigger asChild>
-                <Button className="w-full cursor-pointer h-12">
+                <Button className="w-full cursor-pointer h-12" disabled={!name}>
                   Create a Room
                 </Button>
               </AlertDialogTrigger>
@@ -217,6 +211,7 @@ export default function Home() {
                 <Button
                   className="w-full cursor-pointer h-12"
                   variant="outline"
+                  disabled={!name}
                 >
                   Join a Room
                 </Button>

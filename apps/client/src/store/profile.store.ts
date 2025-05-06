@@ -1,10 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { v4 as uuidv4 } from "uuid";
 
 type ProfileStoreState = {
   id: string;
   name: string;
-  pronouns: string;
+  pronouns?: string;
+  hasHydrated: boolean;
 };
 
 type ProfileStoreAction = {
@@ -20,8 +22,9 @@ const useProfileStore = create<ProfileStore>()(
   persist(
     (set) => ({
       name: "",
-      pronouns: "",
+      pronouns: undefined,
       id: "",
+      hasHydrated: false,
       setId: (id) => set({ id }),
       setName: (name) => set({ name }),
       setPronouns: (pronouns) => set({ pronouns }),
@@ -29,7 +32,13 @@ const useProfileStore = create<ProfileStore>()(
     }),
     {
       name: "profile-storage",
-      partialize: (state) => ({ name: state.name, pronouns: state.pronouns }),
+      onRehydrateStorage: () => (state) => {
+        state!.hasHydrated = true;
+        if (!state!.id) {
+          const newId = uuidv4();
+          state!.setId(newId);
+        }
+      },
     }
   )
 );

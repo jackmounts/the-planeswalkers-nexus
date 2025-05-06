@@ -15,6 +15,6 @@ export function sanitizePlayer(player: Player): Player {
   return {
     ...player,
     name: validator.escape(player.name),
-    pronouns: validator.escape(player.pronouns),
+    pronouns: validator.escape(player.pronouns ?? ""),
   };
 }

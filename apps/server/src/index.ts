@@ -4,12 +4,20 @@ import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import { generateRoomCode, sanitizePlayer } from "./lib/utils";
-import type { Player, PlayerInfo, Room } from "@models/shared";
+import {
+  generateName,
+  type Player,
+  type PlayerInfo,
+  type Room,
+} from "@models/shared";
 
 // -------------------- ROOM DATA --------------------
 const activeRoomsData = new Map<string, Room>();
+const pendingRemovals = new Map<string, NodeJS.Timeout>();
 
 const CLEANUP_TIMER = 10 * 60 * 1000;
+const PENDING_TIMER = 3 * 60 * 1000;
+
 setInterval(() => {
   for (const [roomId, room] of activeRoomsData.entries()) {
     if (room.players.length === 0) {
@@ -133,38 +141,68 @@ io.on("connection", (socket) => {
       socket.emit("error", "Room not found");
       return;
     }
-    const player: Player = {
-      ...playerInfo,
-      socket_id: socket.id,
-      life_points: 40,
-      poison_counters: 0,
-      rad_counters: 0,
-      experience_counters: 0,
-      energy_counters: 0,
-      storm_counters: 0,
-      turnOrder: room.players.length + 1,
-    };
 
-    const existingPlayerIndex = room.players.findIndex(
-      (p) => p.id === playerInfo.id
-    );
-    if (existingPlayerIndex !== -1) {
-      room.players[existingPlayerIndex] = player;
+    if (!playerInfo.name || playerInfo.name.trim() === "") {
+      playerInfo.name = generateName();
+      playerInfo.pronouns = ""; // o un default
+    }
+
+    let player = room.players.find((p) => p.id === playerInfo.id);
+    if (player) {
+      player.socket_id = socket.id;
+      const t = pendingRemovals.get(player.id);
+      if (t) {
+        clearTimeout(t);
+        pendingRemovals.delete(player.id);
+      }
     } else {
-      room.players.push(player);
+      const p: Player = {
+        ...playerInfo,
+        socket_id: socket.id,
+        life_points: 40,
+        poison_counters: 0,
+        rad_counters: 0,
+        experience_counters: 0,
+        energy_counters: 0,
+        storm_counters: 0,
+        turnOrder: room.players.length + 1,
+      };
+      room.players.push(p);
     }
 
     socket.join(roomId);
-    io.to(roomId).emit("players_update", room.players);
-    socket.emit("your_player_id", socket.id);
+    socket.emit("you_are", { socketId: socket.id, name: playerInfo.name });
+    io.to(roomId).emit("players_update", room.players.map(sanitizePlayer));
   });
+
+  socket.on(
+    "signal",
+    (msg: { roomId: string; target: string; from: string; signal: any }) => {
+      const { roomId, target, from, signal } = msg;
+      const socketInRoom = io.sockets.adapter.rooms.get(roomId)?.has(target);
+      if (socketInRoom) {
+        io.sockets.sockets.get(target)?.emit("signal", { from, signal });
+      }
+    }
+  );
 
   socket.on("disconnect", () => {
     for (const [roomId, room] of activeRoomsData.entries()) {
-      const index = room.players.findIndex((p) => p.socket_id === socket.id);
-      if (index !== -1) {
-        room.players.splice(index, 1);
-        io.to(roomId).emit("players_update", room.players);
+      const player = room.players.find((p) => p.socket_id === socket.id);
+      if (player) {
+        const t = setTimeout(() => {
+          const idx = room.players.findIndex((p) => p.id === player.id);
+          if (idx !== -1) {
+            room.players.splice(idx, 1);
+            io.to(roomId).emit(
+              "players_update",
+              room.players.map(sanitizePlayer)
+            );
+          }
+          pendingRemovals.delete(player.id);
+        }, PENDING_TIMER);
+        pendingRemovals.set(player.id, t);
+        break;
       }
     }
   });

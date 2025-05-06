@@ -17,23 +17,105 @@ import { Home, Mic, Video } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 import type { Player } from "@models/shared";
-import { io } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 import useProfileStore from "@/store/profile.store";
+import { computeGridClass } from "@/lib/utils";
+
+const STUN_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
 
 const RoomPage: React.FC = () => {
+  const { roomId } = useParams();
+  const router = useRouter();
+  const { name, setName, pronouns, id, hasHydrated } = useProfileStore();
+
   const [mySocketId, setMySocketId] = React.useState<string | null>(null);
   const [players, setPlayers] = React.useState<Player[]>([]);
   const [stream, setStream] = React.useState<MediaStream | null>(null);
-  const [gridClass, setGridClass] = React.useState<string>(
-    "grid-rows-1 grid-cols-1"
+
+  const socket = React.useRef<Socket>(null);
+  const peerConnections = React.useRef<Map<string, RTCPeerConnection>>(
+    new Map()
   );
-  const { roomId } = useParams();
-  const router = useRouter();
-  const { name, pronouns, id } = useProfileStore();
+  const [remoteStreams, setRemoteStreams] = React.useState<
+    Record<string, MediaStream>
+  >({});
+
+  useEffect(() => {
+    if (!hasHydrated || !id || id === "") return;
+
+    const socket = io("http://localhost:8080");
+
+    socket.on("connect", () => {
+      socket.emit("join_room", roomId, {
+        id: id,
+        name: name,
+        pronouns: pronouns,
+      });
+    });
+
+    socket.on("you_are", (socketId) => {
+      setMySocketId(socketId);
+    });
+
+    socket.on("name_update", (name: string) => {
+      setName(name);
+    });
+
+    socket.on("players_update", (players: Player[]) => {
+      const sorted = players.sort((a, b) => a.turnOrder - b.turnOrder);
+      setPlayers(sorted);
+      sorted.forEach((p) => {
+        if (
+          p.socket_id !== socket.id &&
+          !peerConnections.current.has(p.socket_id)
+        ) {
+          createOffer(p.socket_id);
+        }
+      });
+    });
+
+    socket.on(
+      "signal",
+      async (msg: {
+        from: string;
+        signal: RTCSessionDescriptionInit | RTCIceCandidateInit;
+      }) => {
+        const { from, signal } = msg;
+        let pc = peerConnections.current.get(from);
+        if (!pc) {
+          pc = createPeerConnection(from);
+          peerConnections.current.set(from, pc);
+        }
+
+        if ((signal as RTCSessionDescriptionInit).type) {
+          const desc = signal as RTCSessionDescriptionInit;
+          await pc.setRemoteDescription(new RTCSessionDescription(desc));
+          if (desc.type === "offer") {
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socket.emit("signal", {
+              roomId: roomId,
+              target: from,
+              from: socket.id,
+              signal: answer,
+            });
+          }
+        } else {
+          await pc.addIceCandidate(
+            new RTCIceCandidate(signal as RTCIceCandidateInit)
+          );
+        }
+      }
+    );
+
+    return () => {
+      socket.disconnect();
+      peerConnections.current.forEach((pc) => pc.close());
+    };
+  }, [hasHydrated, id]);
 
   useEffect(() => {
     checkRoomCode();
-
     return () => {
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
@@ -42,40 +124,8 @@ const RoomPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const socket = io("http://localhost:8080");
-    socket.emit("join_room", roomId, {
-      id: id,
-      name: name,
-      pronouns: pronouns,
-    });
-
-    socket.on("your_player_id", (socketId) => {
-      setMySocketId(socketId);
-    });
-
-    socket.on("players_update", (players: Player[]) => {
-      const sorted = players.sort((a, b) => a.turnOrder - b.turnOrder);
-      setPlayers(sorted);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
     getUserMedia();
   }, []);
-
-  useEffect(() => {
-    if (players.length <= 1) setGridClass("grid-rows-1 grid-cols-1");
-    else if (players.length === 2) setGridClass("grid-rows-2 grid-cols-1");
-    else if (players.length === 3) setGridClass("grid-rows-2 grid-cols-2");
-    else if (players.length === 4) setGridClass("grid-rows-2 grid-cols-2");
-    else if (players.length === 5) setGridClass("grid-rows-2 grid-cols-3");
-    else if (players.length === 6) setGridClass("grid-rows-2 grid-cols-3");
-    else setGridClass("grid-rows-3 grid-cols-3");
-  }, [players]);
 
   const checkRoomCode = async () => {
     try {
@@ -102,10 +152,51 @@ const RoomPage: React.FC = () => {
     }
   };
 
+  function createPeerConnection(peerId: string) {
+    const pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+
+    if (stream) {
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+    }
+
+    pc.onicecandidate = (ev) => {
+      if (ev.candidate) {
+        socket.current!.emit("signal", {
+          target: peerId,
+          from: socket.current!.id,
+          signal: ev.candidate.toJSON(),
+        });
+      }
+    };
+
+    pc.ontrack = (ev) => {
+      setRemoteStreams((prev) => ({
+        ...prev,
+        [peerId]: ev.streams[0],
+      }));
+    };
+
+    return pc;
+  }
+
+  async function createOffer(peerId: string) {
+    const pc = createPeerConnection(peerId);
+    peerConnections.current.set(peerId, pc);
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    socket.current!.emit("signal", {
+      target: peerId,
+      from: socket.current!.id,
+      signal: offer,
+    });
+  }
+
   return (
     <div className="w-screen h-screen flex flex-col bg-neutral-800">
       <div className="flex flex-row w-full h-16 items-center justify-between px-8 pt-2 text-white text-2xl">
-        <div className="flex w-full flex-row items-center space-x-4">
+        <div className="flex w-full flex-row items-center justify-start space-x-4">
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Home className="cursor-pointer hover:scale-110" />
@@ -141,17 +232,21 @@ const RoomPage: React.FC = () => {
           <Video className="cursor-pointer hover:scale-110" />
         </div>
       </div>
-      <div className={`grid size-full gap-2 p-2 ${gridClass}`}>
+      <div
+        className={`grid size-full gap-2 p-2 ${computeGridClass(
+          players.length
+        )}`}
+      >
         {players.map((player) => (
           <div
             key={player.id}
-            className="flex flex-col items-center justify-center bg-white size-full"
+            className="flex flex-col items-center justify-center bg-white size-full p-2"
           >
             {player.socket_id === mySocketId && stream ? (
               <video
                 autoPlay
                 muted
-                className="w-full h-full object-cover"
+                className="size-fit object-cover"
                 ref={(video) => {
                   if (video) {
                     video.srcObject = stream;
